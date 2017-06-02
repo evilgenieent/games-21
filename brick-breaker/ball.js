@@ -23,6 +23,14 @@ function Ball(x = 0, y = 0, radius = 10) {
       speedY = value;
     },
 
+    get speedX() {
+      return speedX;
+    },
+
+    get speedY() {
+      return speedY;
+    },
+
     get previousX() {
       return x - speedX;
     },

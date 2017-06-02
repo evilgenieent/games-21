@@ -1,5 +1,7 @@
 let canvas, paddle, mouse, bricksLeft;
 
+const DEBUG = false;
+
 const PADDLE_WIDTH = 100;
 const PADDLE_HEIGHT = 10;
 const PADDLE_DIST_FROM_EDGE = 60;
@@ -31,7 +33,9 @@ function onLoad() {
   setInterval(updateAll, 1000 / framesPerSecond);
 
   canvas.addEventListener('mousemove', onMouseMove);
+
   brickReset();
+  ballReset();
 }
 
 function isGutterRow(row) {
@@ -41,11 +45,13 @@ function isGutterRow(row) {
 function onMouseMove(event) {
   mouse.onMove(event);
   paddle.centerX = mouse.position.x;
-  
-  // Cheat for testing
-  // ball.move(mouse.position.x, mouse.position.y);  
-  // ball.speedX = 0;
-  // ball.speedY = -4;
+
+  // For debugging - allow moving the ball via the mouse for testing
+  if (DEBUG) {
+    ball.move(mouse.position.x, mouse.position.y);
+    ball.speedX = 0;
+    ball.speedY = -4;
+  }
 }
 
 function updateAll() {
@@ -58,23 +64,24 @@ function moveBall() {
   ball.moveY();
 
   // Left
-  if (ball.x < 0) {
+  if (ball.x < 0 && ball.speedX < 0.0) {
     ball.reverseSpeedX();
   }
 
   // Right
-  if (ball.x > canvas.width) {
+  if (ball.x > canvas.width && ball.speedX > 0.0) {
     ball.reverseSpeedX();
   }
 
   // Top
-  if (ball.y < 0) {
+  if (ball.y < 0 && ball.speedY < 0.0) {
     ball.reverseSpeedY();
   }
 
   // Bottom
   if (ball.y > canvas.height) {
     ballReset();
+    brickReset();
   }
 }
 
@@ -98,6 +105,16 @@ function isBrickVisible(brick) {
   return brick && brick.visible;
 }
 
+function isColRowWithinGrid(col, row) {
+  return col >= 0 && col < BRICK_COLS && row >= 0 && row < BRICK_ROWS;
+}
+
+function isBrickAtColRow(col, row) {
+  return isColRowWithinGrid(col, row)
+    ? brickList[calcBrickIndexFromColAndRow(col, row)]
+    : false;
+}
+
 function handleBallBrickInteraction() {
   const ballBrickCol = Math.floor(ball.x / BRICK_WIDTH);
   const ballBrickRow = Math.floor(ball.y / BRICK_HEIGHT);
@@ -107,25 +124,18 @@ function handleBallBrickInteraction() {
   );
   const brick = brickList[brickIndexUnderBall];
 
-  if (
-    ballBrickCol >= 0 &&
-    ballBrickCol < BRICK_COLS &&
-    ballBrickRow >= 0 &&
-    ballBrickRow < BRICK_ROWS
-  ) {
+  if (isColRowWithinGrid(ballBrickCol, ballBrickRow)) {
     if (brick.visible) {
       brick.hide();
       bricksLeft--;
-      
+
       let bothTestsFailed = true;
       const previousBrickCol = Math.floor(ball.previousX / BRICK_WIDTH);
       const previousBrickRow = Math.floor(ball.previousY / BRICK_HEIGHT);
 
       // Side collision
       if (ballBrickCol !== previousBrickCol) {
-        const adjBrickSide = calcBrickIndexFromColAndRow(previousBrickCol, ballBrickRow);
-        const adjBrick = brickList[adjBrickSide];
-        if (!isBrickVisible(adjBrick)) {
+        if (!isBrickAtColRow(previousBrickCol, ballBrickRow)) {
           ball.reverseSpeedX();
           bothTestsFailed = false;
         }
@@ -133,9 +143,7 @@ function handleBallBrickInteraction() {
 
       // Top / Bottom collision
       if (ballBrickRow !== previousBrickRow) {
-        const adjBrickTopBottomIndex = calcBrickIndexFromColAndRow(ballBrickCol, previousBrickRow);
-        const adjBrick = brickList[adjBrickTopBottomIndex];
-        if (!isBrickVisible(adjBrick)) {
+        if (!isBrickAtColRow(ballBrickCol, previousBrickRow)) {
           ball.reverseSpeedY();
           bothTestsFailed = false;
         }
@@ -154,7 +162,15 @@ function handleBallPaddleInteraction() {
   if (paddle.isCoordWithinPaddle(ball.x, ball.y)) {
     ball.reverseSpeedY();
     ball.speedX = paddle.getDistFromCenterX(ball.x) * 0.35;
+
+    if (!haveBrickLeft()) {
+      brickReset();
+    }
   }
+}
+
+function haveBrickLeft() {
+  return bricksLeft > 0;
 }
 
 function moveAll() {
@@ -204,11 +220,6 @@ function drawAll() {
   brickList.forEach(drawBrickIfVisible);
 
   drawText(`Bricks Left: ${bricksLeft}`, 10, 20, COLORS.WHITE);
-
-  // Just for debugging
-  // const mouseBrickCol = Math.floor(mouse.x / BRICK_WIDTH);
-  // const mouseBrickRow = Math.floor(mouse.y / BRICK_HEIGHT);
-  // const brickIndex = calcBrickIndexFromColAndRow(mouseBrickCol, mouseBrickRow);
 }
 
 function blankScreen() {
